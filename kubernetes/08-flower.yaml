@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: flower
+  namespace: grammar-correction
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: flower
+  template:
+    metadata:
+      labels:
+        app: flower
+    spec:
+      containers:
+        - name: flower
+          image: your-registry/grammar-correction-api:latest
+          command: ["celery", "-A", "app.celery_app", "flower", "--port=5555"]
+          ports:
+            - containerPort: 5555
+          envFrom:
+            - configMapRef:
+                name: grammar-config
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: flower-service
+  namespace: grammar-correction
+spec:
+  selector:
+    app: flower
+  ports:
+    - protocol: TCP
+      port: 5555
+      targetPort: 5555
+  type: LoadBalancer

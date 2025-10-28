@@ -1,0 +1,63 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grammar-api
+  namespace: grammar-correction
+  labels:
+    app: grammar-api
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: grammar-api
+  template:
+    metadata:
+      labels:
+        app: grammar-api
+    spec:
+      containers:
+        - name: api
+          image: your-registry/grammar-correction-api:v1.0.0
+          ports:
+            - containerPort: 8000
+          envFrom:
+            - configMapRef:
+                name: grammar-config
+            - secretRef:
+                name: redis-secret-string
+          env:
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: redis-secret-string
+                  key: redis-password
+          resources:
+            requests:
+              memory: "1Gi"
+              cpu: "500m"
+            limits:
+              memory: "2Gi"
+              cpu: "2000m"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            timeoutSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          volumeMounts:
+            - name: tmp-uploads
+              mountPath: /tmp/uploads
+            - name: tmp-outputs
+              mountPath: /tmp/outputs
+      volumes:
+        - name: tmp-uploads
+          emptyDir: {}
+        - name: tmp-outputs
+          emptyDir: {}

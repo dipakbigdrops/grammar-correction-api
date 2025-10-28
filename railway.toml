@@ -1,0 +1,57 @@
+# Railway.app Configuration for Grammar Correction API
+
+# Railway will automatically detect this as a Python project
+# and use the requirements.txt for dependencies
+
+# Build Configuration
+[build]
+builder = "nixpacks"
+
+[build.nixpacks]
+providers = ["python"]
+
+# Environment Variables (set these in Railway dashboard)
+[env]
+PYTHON_VERSION = "3.11"
+PORT = "8000"
+HOST = "0.0.0.0"
+
+# Redis Configuration (Railway will provide these)
+REDIS_URL = "${{ Redis.REDIS_URL }}"
+REDIS_PASSWORD = "${{ Redis.REDIS_PASSWORD }}"
+REDIS_HOST = "${{ Redis.REDIS_HOST }}"
+REDIS_PORT = "${{ Redis.REDIS_PORT }}"
+
+# Application Configuration
+DEBUG = "false"
+LOG_LEVEL = "INFO"
+ALLOWED_ORIGINS = "[\"*\"]"
+
+# Celery Configuration
+CELERY_BROKER_URL = "${{ Redis.REDIS_URL }}"
+CELERY_RESULT_BACKEND = "${{ Redis.REDIS_URL }}"
+
+# Flower Configuration
+FLOWER_USER = "admin"
+FLOWER_PASSWORD = "BigDrops@9991"
+
+# Performance Configuration
+RATE_LIMIT_PER_MINUTE = "100"
+RATE_LIMIT_BURST = "200"
+MAX_WORKERS = "4"
+
+# Model Configuration
+MODEL_PATH = "./model"
+MAX_FILE_SIZE = "10485760"  # 10MB
+MAX_ZIP_EXTRACT_SIZE = "52428800"  # 50MB
+MAX_FILES_IN_ZIP = "100"
+
+# Security
+SECRET_KEY = "${{ RAILWAY_STATIC_URL }}"
+
+# Health Check
+HEALTH_CHECK_INTERVAL = "30"
+
+# Monitoring
+ENABLE_METRICS = "true"
+ENABLE_PERFORMANCE_MONITORING = "true"

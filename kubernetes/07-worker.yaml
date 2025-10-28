@@ -1,0 +1,67 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grammar-worker
+  namespace: grammar-correction
+  labels:
+    app: grammar-worker
+spec:
+  replicas: 5
+  selector:
+    matchLabels:
+      app: grammar-worker
+  template:
+    metadata:
+      labels:
+        app: grammar-worker
+    spec:
+      containers:
+        - name: worker
+          image: your-registry/grammar-correction-api:latest
+          command: ["celery", "-A", "app.celery_app", "worker", "--loglevel=info", "--concurrency=2"]
+          envFrom:
+            - configMapRef:
+                name: grammar-config
+          resources:
+            requests:
+              memory: "2Gi"
+              cpu: "1000m"
+            limits:
+              memory: "4Gi"
+              cpu: "2000m"
+          volumeMounts:
+            - name: tmp-uploads
+              mountPath: /tmp/uploads
+            - name: tmp-outputs
+              mountPath: /tmp/outputs
+      volumes:
+        - name: tmp-uploads
+          emptyDir: {}
+        - name: tmp-outputs
+          emptyDir: {}
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: grammar-worker-hpa
+  namespace: grammar-correction
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: grammar-worker
+  minReplicas: 5
+  maxReplicas: 50
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 75
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 85
