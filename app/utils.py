@@ -2,12 +2,15 @@
 Utility Functions
 """
 import hashlib
-import os
-from typing import Optional
-import redis
-from app.config import settings
-import logging
 import json
+import logging
+import os
+import time
+from typing import Optional
+
+import redis
+
+from app.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -145,8 +148,6 @@ def save_uploaded_file(file_content: bytes, filename: str, upload_dir: str = "/t
 
 def cleanup_old_files(directory: str, max_age_seconds: int = 3600):
     """Clean up old files from directory"""
-    import time
-    
     if not os.path.exists(directory):
         return
     
