@@ -49,12 +49,12 @@ class GrammarCorrectionProcessor:
         """Load model with ultimate robust error handling"""
         try:
             if os.path.exists(settings.MODEL_PATH):
-                logger.info(f" Loading model from {settings.MODEL_PATH}")
-                
+                logger.info(" Loading model from %s", settings.MODEL_PATH)
+
                 # Get model info first
                 from app.robust_model_loader import get_model_info
                 model_info = get_model_info(settings.MODEL_PATH)
-                logger.info(f"Model info: {model_info}")
+                logger.info("Model info: %s", model_info)
                 
                 # Try to load with ultimate robust loader
                 self.model, self.tokenizer = load_robust_model(settings.MODEL_PATH)
@@ -65,30 +65,30 @@ class GrammarCorrectionProcessor:
                     # Test the model with a simple inference
                     try:
                         test_result = test_model_inference(self.model, self.tokenizer, "This is a test.")
-                        logger.info(f" Model test successful: '{test_result}'")
-                    except Exception as test_e:
-                        logger.warning(f"Model test failed but model loaded: {test_e}")
-                else:
+                        logger.info(" Model test successful: '%s'", test_result)
+                    except (RuntimeError, AttributeError) as test_e:
+                        logger.warning("Model test failed but model loaded: %s", test_e)
+                if self.model is None or self.tokenizer is None:
                     logger.warning(" Model loading failed, using fallback")
                     self.model = None
                     self.tokenizer = None
-            else:
-                logger.warning(f" Model path not found: {settings.MODEL_PATH}")
+            if not os.path.exists(settings.MODEL_PATH):
+                logger.warning(" Model path not found: %s", settings.MODEL_PATH)
                 self.model = None
                 self.tokenizer = None
-        except Exception as e:
-            logger.error(f" Error loading model: {e}")
+        except (OSError, RuntimeError, ImportError) as e:
+            logger.error(" Error loading model: %s", e)
             self.model = None
             self.tokenizer = None
     
     def _initialize_ocr(self):
-        """Initialize OCR"""
+        """Initialize OCR reader for text extraction from images"""
         try:
-            import easyocr
+            import easyocr  # pylint: disable=import-outside-toplevel
             self.ocr_reader = easyocr.Reader(['en'])
             logger.info("OCR initialized")
-        except Exception as e:
-            logger.warning(f"OCR not available: {e}")
+        except (ImportError, OSError, RuntimeError) as e:
+            logger.warning("OCR not available: %s", e)
             self.ocr_reader = None
     
     def is_ready(self) -> Dict[str, bool]:
@@ -99,16 +99,24 @@ class GrammarCorrectionProcessor:
         }
     
     def handle_input(self, input_source_path: str) -> Tuple[Optional[Any], str]:
-        """Handle input"""
+        """
+        Handle input file and determine its type.
+
+        Args:
+            input_source_path: Path to the input file
+
+        Returns:
+            Tuple of (content/path, input_type) or (None, error_type)
+        """
         if not os.path.isfile(input_source_path):
-            logger.error(f"File not found at {input_source_path}")
+            logger.error("File not found at %s", input_source_path)
             return None, 'file_not_found'
 
         file_extension = os.path.splitext(input_source_path)[1].lower()
 
         if file_extension in settings.ALLOWED_IMAGE_EXTENSIONS:
             return input_source_path, 'image'
-        elif file_extension in settings.ALLOWED_HTML_EXTENSIONS:
+        if file_extension in settings.ALLOWED_HTML_EXTENSIONS:
             # Try multiple encodings to handle different file formats
             encodings = ['utf-8', 'utf-16', 'utf-16-le', 'utf-16-be', 'latin-1', 'cp1252']
             
@@ -116,12 +124,12 @@ class GrammarCorrectionProcessor:
                 try:
                     with open(input_source_path, 'r', encoding=encoding) as f:
                         content = f.read()
-                    logger.info(f"Successfully read HTML file with {encoding} encoding")
+                    logger.info("Successfully read HTML file with %s encoding", encoding)
                     return content, 'html'
                 except UnicodeDecodeError:
                     continue
-                except Exception as e:
-                    logger.warning(f"Error reading HTML file with {encoding}: {e}")
+                except OSError as e:
+                    logger.warning("Error reading HTML file with %s: %s", encoding, e)
                     continue
             
             # If all encodings fail, try reading as binary and decode with error handling
@@ -139,15 +147,23 @@ class GrammarCorrectionProcessor:
                     content = raw_content.decode('utf-8', errors='ignore')
                 logger.info("Successfully read HTML file with error handling")
                 return content, 'html'
-            except Exception as e:
-                logger.error(f"Error reading HTML file with all methods: {e}")
+            except (OSError, IOError) as e:
+                logger.error("Error reading HTML file with all methods: %s", e)
                 return None, 'html_read_error'
-        else:
-            logger.error(f"Unsupported file type: {file_extension}")
-            return None, 'unknown_file_type'
+        logger.error("Unsupported file type: %s", file_extension)
+        return None, 'unknown_file_type'
 
     def extract_text(self, content: Any, input_type: str) -> Tuple[Any, Any]:
-        """Extract text"""
+        """
+        Extract text from image or HTML content.
+
+        Args:
+            content: Image path (str) or HTML content (str)
+            input_type: Type of input ('image' or 'html')
+
+        Returns:
+            Tuple of (extracted_text, metadata)
+        """
         if input_type == 'image':
             if not self.ocr_reader:
                 logger.error("OCR reader not available")
@@ -157,11 +173,11 @@ class GrammarCorrectionProcessor:
                 results = self.ocr_reader.readtext(content)
                 extracted_texts = [item[1] for item in results]
                 return extracted_texts, results
-            except Exception as e:
-                logger.error(f"Error during OCR: {e}")
+            except (OSError, ValueError, AttributeError) as e:
+                logger.error("Error during OCR: %s", e)
                 return [], []
 
-        elif input_type == 'html':
+        if input_type == 'html':
             # For HTML, we need to preserve the structure while extracting text for correction
             soup = BeautifulSoup(content, 'html.parser')
             
@@ -181,7 +197,7 @@ class GrammarCorrectionProcessor:
             # Return both the extracted text and the soup object for reconstruction
             return extracted_text, soup
 
-            return None, None
+        return None, None
 
     def correct_grammar(self, text: str) -> str:
         """Correct grammar with improved fallback handling"""
@@ -231,17 +247,15 @@ class GrammarCorrectionProcessor:
                 # Try fallback correction to catch obvious errors the model missed
                 fallback_result = self._fallback_correction(text)
                 if fallback_result != text:
-                    logger.info(f" Fallback correction applied: '{text[:50]}...' -> '{fallback_result[:50]}...'")
+                    logger.info(" Fallback correction applied: '%s...' -> '%s...'", text[:50], fallback_result[:50])
                     return fallback_result
-                else:
-                    logger.info("No corrections needed - text is grammatically correct")
-                    return text
-            else:
-                logger.info(f" Grammar correction applied: '{text[:50]}...' -> '{corrected_text[:50]}...'")
-                return corrected_text
-                
-        except Exception as e:
-            logger.error(f"Grammar correction error: {e}")
+                logger.info("No corrections needed - text is grammatically correct")
+                return text
+            logger.info(" Grammar correction applied: '%s...' -> '%s...'", text[:50], corrected_text[:50])
+            return corrected_text
+
+        except (RuntimeError, AttributeError, ValueError) as e:
+            logger.error("Grammar correction error: %s", e)
             logger.info("Falling back to rule-based correction")
             return self._fallback_correction(text)
     
@@ -291,7 +305,7 @@ class GrammarCorrectionProcessor:
             corrected_text = new_text
         
         if corrections_made > 0:
-            logger.info(f"Fallback correction applied {corrections_made} fixes")
+            logger.info("Fallback correction applied %d fixes", corrections_made)
         
         return corrected_text
 
@@ -368,8 +382,8 @@ class GrammarCorrectionProcessor:
                                 corrected_context_start = max(0, corr_index_in_words - context_words)
                                 corrected_context_end = min(len(corrected_words), corr_index_in_words + len([corr]) + context_words)
                                 original_context = " ".join(corrected_words[corrected_context_start:corrected_context_end])
-                        except Exception as e:
-                            logger.error(f"Error getting original context for {orig}: {e}")
+                        except (IndexError, ValueError) as e:
+                            logger.error("Error getting original context for %s: %s", orig, e)
                             original_context = ""
 
                         # Get corrected context words
@@ -389,8 +403,8 @@ class GrammarCorrectionProcessor:
                                 original_context_start = max(0, orig_index_in_words - context_words)
                                 original_context_end = min(len(original_words), orig_index_in_words + len([orig]) + context_words)
                                 corrected_context = " ".join(original_words[original_context_start:original_context_end])
-                        except Exception as e:
-                            logger.error(f"Error getting corrected context for {corr}: {e}")
+                        except (IndexError, ValueError) as e:
+                            logger.error("Error getting corrected context for %s: %s", corr, e)
                             corrected_context = ""
 
                         # Only add meaningful corrections (filter out empty or unchanged corrections)
@@ -485,7 +499,7 @@ class GrammarCorrectionProcessor:
                 orig_word.strip() != '' and corr_word.strip() != ''):
                 cleaned_corrections.append(corr_dict)
         
-        logger.info(f"Filtered corrections: {len(corrections)} -> {len(cleaned_corrections)} meaningful corrections")
+        logger.info("Filtered corrections: %d -> %d meaningful corrections", len(corrections), len(cleaned_corrections))
 
         return cleaned_corrections
 
@@ -499,11 +513,11 @@ class GrammarCorrectionProcessor:
             logger.info("No corrections identified for image. Returning original image.")
             try:
                 return Image.open(original_content).convert("RGB")
-            except Exception as e:
-                logger.error(f"Error loading original image for return: {e}")
+            except (OSError, IOError) as e:
+                logger.error("Error loading original image for return: %s", e)
                 return None
-        elif not corrections and input_type == 'html':
-            logger.info(f"No corrections identified for {input_type}. Returning original content.")
+        if not corrections and input_type == 'html':
+            logger.info("No corrections identified for %s. Returning original content.", input_type)
             return original_content
 
         # Proceed with highlighting only if corrections exist
@@ -562,11 +576,11 @@ class GrammarCorrectionProcessor:
 
                 return img  # Return the PIL Image object
 
-            except Exception as e:
-                logger.error(f"Error processing image for highlighting: {e}")
+            except (OSError, IOError, ValueError) as e:
+                logger.error("Error processing image for highlighting: %s", e)
                 return None
 
-        elif input_type == 'html':
+        if input_type == 'html':
             try:
                 # original_content is already a soup object from extract_text
                 if hasattr(original_content, 'find_all'):
@@ -611,14 +625,25 @@ class GrammarCorrectionProcessor:
                         text_node.replace_with(new_text_node)
 
                 return soup
-            except Exception as e:
-                logger.error(f"HTML processing error: {e}")
+            except (ValueError, AttributeError) as e:
+                logger.error("HTML processing error: %s", e)
                 return None
 
-            return None
+        return None
 
     def generate_output(self, reconstructed_content: Any, input_type: str, corrections: List[Dict], output_dir: str = "/tmp") -> Tuple[Optional[str], str]:
-        """Generate output - returns base64 for images, HTML string for HTML"""
+        """
+        Generate output - returns base64 for images, HTML string for HTML.
+
+        Args:
+            reconstructed_content: Processed content (Image or HTML)
+            input_type: Type of input ('image' or 'html')
+            corrections: List of correction dictionaries
+            output_dir: Output directory (unused, kept for compatibility)
+
+        Returns:
+            Tuple of (content_output, json_output_string)
+        """
         content_output = None
 
         if input_type == 'image':
@@ -630,8 +655,8 @@ class GrammarCorrectionProcessor:
                     img_base64 = base64.b64encode(buffered.getvalue()).decode('utf-8')
                     content_output = f"data:image/png;base64,{img_base64}"
                     logger.info("Image converted to base64 successfully")
-                except Exception as e:
-                    logger.error(f"Error converting image to base64: {e}")
+                except (OSError, IOError) as e:
+                    logger.error("Error converting image to base64: %s", e)
                     content_output = "Error converting image to base64"
 
         elif input_type == 'html':
@@ -650,14 +675,23 @@ class GrammarCorrectionProcessor:
 
         try:
             json_output_string = json.dumps(corrections, indent=4)
-        except Exception as e:
-            logger.error(f"Error generating JSON: {e}")
+        except (TypeError, ValueError) as e:
+            logger.error("Error generating JSON: %s", e)
             json_output_string = "[]"
         
         return content_output, json_output_string
     
     def process_input(self, input_source_path: str, output_dir: str = "/tmp") -> Dict[str, Any]:
-        """Process input end-to-end"""
+        """
+        Process input end-to-end.
+
+        Args:
+            input_source_path: Path to input file
+            output_dir: Output directory (unused, kept for compatibility)
+
+        Returns:
+            Dictionary with processing results
+        """
         start_time = time.time()
         
         try:
@@ -741,8 +775,8 @@ class GrammarCorrectionProcessor:
                 "processing_time_seconds": round(processing_time, 2)
             }
         
-        except Exception as e:
-            logger.error(f"Error in process_input: {e}", exc_info=True)
+        except (OSError, RuntimeError, ValueError) as e:
+            logger.error("Error in process_input: %s", e, exc_info=True)
             return {
                 "success": False,
                 "error": str(e),

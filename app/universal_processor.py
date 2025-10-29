@@ -58,7 +58,7 @@ class UniversalProcessor:
             
             if cached_result:
                 self.stats['cache_hits'] += 1
-                logger.info(f"Cache hit for {os.path.basename(file_path)}")
+                logger.info("Cache hit for %s", os.path.basename(file_path))
                 return {
                     **cached_result,
                     'cached': True,
@@ -85,8 +85,8 @@ class UniversalProcessor:
             
             return result
             
-        except Exception as e:
-            logger.error(f"Error processing {file_path}: {e}", exc_info=True)
+        except (OSError, IOError, RuntimeError) as e:
+            logger.error("Error processing %s: %s", file_path, e, exc_info=True)
             return {
                 'success': False,
                 'error': str(e),
@@ -107,8 +107,8 @@ class UniversalProcessor:
             
             return result
             
-        except Exception as e:
-            logger.error(f"Error processing single file {file_path}: {e}")
+        except (OSError, RuntimeError, ValueError) as e:
+            logger.error("Error processing single file %s: %s", file_path, e)
             return {
                 'success': False,
                 'error': str(e),
@@ -146,8 +146,8 @@ class UniversalProcessor:
             
             return result
             
-        except Exception as e:
-            logger.error(f"Error processing ZIP file {file_path}: {e}")
+        except (OSError, IOError, RuntimeError) as e:
+            logger.error("Error processing ZIP file %s: %s", file_path, e)
             return {
                 'success': False,
                 'error': str(e),
@@ -158,11 +158,11 @@ class UniversalProcessor:
     def _compute_file_hash(self, file_path: str) -> str:
         """Compute hash for caching"""
         try:
-            import hashlib
+            import hashlib  # pylint: disable=import-outside-toplevel
             with open(file_path, 'rb') as f:
                 return hashlib.sha256(f.read()).hexdigest()
-        except Exception as e:
-            logger.error(f"Error computing file hash: {e}")
+        except (OSError, IOError) as e:
+            logger.error("Error computing file hash: %s", e)
             return str(time.time())  # Fallback to timestamp
     
     def get_performance_stats(self) -> Dict[str, Any]:

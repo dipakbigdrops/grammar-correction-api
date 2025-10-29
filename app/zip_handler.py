@@ -80,13 +80,13 @@ class ZipHandler:
                     
                     # Check if file type is allowed
                     if not self.is_valid_file(filename):
-                        logger.debug(f"Skipping unsupported file: {filename}")
+                        logger.debug("Skipping unsupported file: %s", filename)
                         metadata["skipped_files"] += 1
                         continue
                     
                     # Check file count limit
                     if len(extracted_files) >= settings.MAX_FILES_IN_ZIP:
-                        logger.warning(f"Reached maximum file limit ({settings.MAX_FILES_IN_ZIP})")
+                        logger.warning("Reached maximum file limit (%d)", settings.MAX_FILES_IN_ZIP)
                         metadata["errors"].append(f"Maximum file limit reached ({settings.MAX_FILES_IN_ZIP})")
                         break
                     
@@ -95,25 +95,26 @@ class ZipHandler:
                         extracted_path = zip_ref.extract(file_info, extract_dir)
                         extracted_files.append(extracted_path)
                         metadata["valid_files"] += 1
-                        logger.info(f"Extracted: {filename}")
-                        
-                    except Exception as e:
-                        logger.error(f"Error extracting {filename}: {e}")
+                        logger.info("Extracted: %s", filename)
+
+                    except (OSError, zipfile.BadZipFile) as e:
+                        logger.error("Error extracting %s: %s", filename, e)
                         metadata["errors"].append(f"Failed to extract {filename}: {str(e)}")
                         continue
                 
                 logger.info(
-                    f"ZIP extraction complete: {metadata['valid_files']} valid files, "
-                    f"{metadata['skipped_files']} skipped"
+                    "ZIP extraction complete: %d valid files, %d skipped",
+                    metadata['valid_files'],
+                    metadata['skipped_files']
                 )
                 
                 return extracted_files, metadata
                 
         except zipfile.BadZipFile as e:
-            logger.error(f"Bad ZIP file: {e}")
-            raise ValueError(f"Corrupted ZIP file: {str(e)}")
-        except Exception as e:
-            logger.error(f"Error processing ZIP file: {e}")
+            logger.error("Bad ZIP file: %s", e)
+            raise ValueError("Corrupted ZIP file: %s" % str(e)) from e
+        except (OSError, IOError) as e:
+            logger.error("Error processing ZIP file: %s", e)
             raise
     
     def process_zip_file(self, zip_path: str, processor, output_dir: str) -> Dict[str, Any]:
@@ -148,7 +149,7 @@ class ZipHandler:
                 
                 for file_path in extracted_files:
                     try:
-                        logger.info(f"Processing: {os.path.basename(file_path)}")
+                        logger.info("Processing: %s", os.path.basename(file_path))
                         
                         # Process individual file
                         result = processor.process_input(file_path, output_dir=output_dir)
@@ -161,8 +162,8 @@ class ZipHandler:
                         if result.get("success"):
                             total_corrections += result.get("corrections_count", 0)
                         
-                    except Exception as e:
-                        logger.error(f"Error processing {file_path}: {e}")
+                    except (OSError, RuntimeError, ValueError) as e:
+                        logger.error("Error processing %s: %s", file_path, e)
                         results.append({
                             "success": False,
                             "filename": os.path.basename(file_path),
@@ -186,8 +187,8 @@ class ZipHandler:
                     "results": results
                 }
                 
-            except Exception as e:
-                logger.error(f"Error processing ZIP file: {e}")
+            except (OSError, RuntimeError) as e:
+                logger.error("Error processing ZIP file: %s", e)
                 return {
                     "success": False,
                     "error": str(e),

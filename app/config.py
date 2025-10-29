@@ -120,13 +120,15 @@ class Settings(BaseSettings):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         # Auto-generate Celery URLs if not provided
-        if not self.CELERY_BROKER_URL:
+        if not self.CELERY_BROKER_URL or not self.CELERY_RESULT_BACKEND:
             redis_auth = f":{self.REDIS_PASSWORD}@" if self.REDIS_PASSWORD else ""
-            self.CELERY_BROKER_URL = f"redis://{redis_auth}{self.REDIS_HOST}:{self.REDIS_PORT}/{self.REDIS_DB}"
-        
-        if not self.CELERY_RESULT_BACKEND:
-            redis_auth = f":{self.REDIS_PASSWORD}@" if self.REDIS_PASSWORD else ""
-            self.CELERY_RESULT_BACKEND = f"redis://{redis_auth}{self.REDIS_HOST}:{self.REDIS_PORT}/{self.REDIS_DB}"
+            redis_url = f"redis://{redis_auth}{self.REDIS_HOST}:{self.REDIS_PORT}/{self.REDIS_DB}"
+            
+            if not self.CELERY_BROKER_URL:
+                self.CELERY_BROKER_URL = redis_url
+            
+            if not self.CELERY_RESULT_BACKEND:
+                self.CELERY_RESULT_BACKEND = redis_url
         
         # Validate batch processing settings
         if self.MAX_FILES_IN_ZIP > 1000:

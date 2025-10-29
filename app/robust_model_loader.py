@@ -18,10 +18,10 @@ def load_robust_model(model_path: str) -> Tuple[Optional[Any], Optional[Any]]:
     Handles all known tokenizer issues permanently
     """
     if not os.path.exists(model_path):
-        logger.error(f"Model path does not exist: {model_path}")
+        logger.error("Model path does not exist: %s", model_path)
         return None, None
     
-    logger.info(f"🚀 Starting ultimate model loading for: {model_path}")
+    logger.info("🚀 Starting ultimate model loading for: %s", model_path)
     
     # Strategy 1: Fix tokenizer config and load with T5Tokenizer
     try:
@@ -29,53 +29,53 @@ def load_robust_model(model_path: str) -> Tuple[Optional[Any], Optional[Any]]:
         model, tokenizer = _load_with_fixed_t5_tokenizer(model_path)
         if model and tokenizer:
             return model, tokenizer
-    except Exception as e:
-        logger.warning(f"Strategy 1 failed: {e}")
-    
+    except (OSError, ImportError, RuntimeError) as e:
+        logger.warning("Strategy 1 failed: %s", e)
+
     # Strategy 2: AutoTokenizer with legacy=False
     try:
         logger.info("Strategy 2: AutoTokenizer with legacy=False...")
         model, tokenizer = _load_with_auto_tokenizer_legacy_false(model_path)
         if model and tokenizer:
             return model, tokenizer
-    except Exception as e:
-        logger.warning(f"Strategy 2 failed: {e}")
-    
+    except (OSError, ImportError, RuntimeError) as e:
+        logger.warning("Strategy 2 failed: %s", e)
+
     # Strategy 3: AutoTokenizer with custom tokenizer class
     try:
         logger.info("Strategy 3: AutoTokenizer with custom tokenizer class...")
         model, tokenizer = _load_with_custom_tokenizer_class(model_path)
         if model and tokenizer:
             return model, tokenizer
-    except Exception as e:
-        logger.warning(f"Strategy 3 failed: {e}")
-    
+    except (OSError, ImportError, RuntimeError) as e:
+        logger.warning("Strategy 3 failed: %s", e)
+
     # Strategy 4: Manual tokenizer creation
     try:
         logger.info("Strategy 4: Manual tokenizer creation...")
         model, tokenizer = _load_with_manual_tokenizer(model_path)
         if model and tokenizer:
             return model, tokenizer
-    except Exception as e:
-        logger.warning(f"Strategy 4 failed: {e}")
-    
+    except (OSError, ImportError, RuntimeError) as e:
+        logger.warning("Strategy 4 failed: %s", e)
+
     # Strategy 5: Fallback to basic T5 classes
     try:
         logger.info("Strategy 5: Basic T5 classes...")
         model, tokenizer = _load_with_basic_t5(model_path)
         if model and tokenizer:
             return model, tokenizer
-    except Exception as e:
-        logger.warning(f"Strategy 5 failed: {e}")
-    
+    except (OSError, ImportError, RuntimeError) as e:
+        logger.warning("Strategy 5 failed: %s", e)
+
     # Strategy 6: Fallback without SentencePiece (emergency fallback)
     try:
         logger.info("Strategy 6: Emergency fallback without SentencePiece...")
         model, tokenizer = _load_without_sentencepiece(model_path)
         if model and tokenizer:
             return model, tokenizer
-    except Exception as e:
-        logger.warning(f"Strategy 6 failed: {e}")
+    except (OSError, ImportError, RuntimeError) as e:
+        logger.warning("Strategy 6 failed: %s", e)
     
     logger.error("❌ All model loading strategies failed")
     return None, None
@@ -218,8 +218,8 @@ def _load_with_basic_t5(model_path: str) -> Tuple[Optional[Any], Optional[Any]]:
         if _test_model_inference(model, tokenizer):
             logger.info(" Strategy 5 successful: Basic T5 classes")
             return model, tokenizer
-    except Exception as e:
-        logger.warning(f"Basic T5 loading failed: {e}")
+    except (OSError, ImportError, RuntimeError, AttributeError) as e:
+        logger.warning("Basic T5 loading failed: %s", e)
     
     return None, None
 
@@ -270,8 +270,8 @@ def _load_without_sentencepiece(model_path: str) -> Tuple[Optional[Any], Optiona
         if _test_model_inference(model, tokenizer):
             logger.info(" Strategy 6 successful: Emergency fallback without SentencePiece")
             return model, tokenizer
-    except Exception as e:
-        logger.warning(f"Emergency fallback failed: {e}")
+    except (OSError, ImportError, RuntimeError, AttributeError) as e:
+        logger.warning("Emergency fallback failed: %s", e)
     
     return None, None
 
@@ -293,8 +293,8 @@ def _test_model_inference(model, tokenizer) -> bool:
         # If we get a result (even if same as input), it's working
         return result is not None and len(result.strip()) > 0
         
-    except Exception as e:
-        logger.debug(f"Model inference test failed: {e}")
+    except (RuntimeError, AttributeError, ValueError) as e:
+        logger.debug("Model inference test failed: %s", e)
         return False
 
 
@@ -349,8 +349,8 @@ def test_model_inference(model, tokenizer, text: str) -> str:
         # Model succeeded - return corrected text (may be same as input if no errors)
         return corrected_text
         
-    except Exception as e:
-        logger.error(f"Model inference failed: {e}")
+    except (RuntimeError, AttributeError, ValueError, OSError) as e:
+        logger.error("Model inference failed: %s", e)
         return text  # Return original text on error
 
 

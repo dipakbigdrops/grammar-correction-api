@@ -41,7 +41,7 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     """Application lifespan manager for startup and shutdown events"""
     # Startup
-    logger.info(f"Starting {settings.APP_NAME} v{settings.APP_VERSION}")
+    logger.info("Starting %s v%s", settings.APP_NAME, settings.APP_VERSION)
     
     # Test Redis connection
     try:
@@ -50,16 +50,16 @@ async def lifespan(app: FastAPI):
             logger.info("Redis connected successfully")
         else:
             logger.warning("Redis connection failed - caching disabled")
-    except Exception as e:
-        logger.warning(f"Redis connection test failed: {e}")
+    except (ConnectionError, OSError) as e:
+        logger.warning("Redis connection test failed: %s", e)
     
     # Create necessary directories
     try:
         os.makedirs("/tmp/uploads", exist_ok=True)
         os.makedirs("/tmp/outputs", exist_ok=True)
         logger.info("Created necessary directories")
-    except Exception as e:
-        logger.error(f"Failed to create directories: {e}")
+    except OSError as e:
+        logger.error("Failed to create directories: %s", e)
     
     logger.info("Application started successfully")
     
@@ -98,7 +98,7 @@ app.add_middleware(RateLimitMiddleware, requests_per_minute=1000, burst=2000)
 async def root():
     """Root endpoint"""
     return {
-        "message": f"Welcome to {settings.APP_NAME}",
+        "message": "Welcome to {}".format(settings.APP_NAME),
         "version": settings.APP_VERSION,
         "docs": "/docs",
         "health": "/health"
@@ -114,8 +114,8 @@ async def health_check():
         if client:
             client.ping()
             redis_connected = True
-    except Exception as e:
-        logger.debug(f"Redis health check failed: {e}")
+    except (ConnectionError, AttributeError) as e:
+        logger.debug("Redis health check failed: %s", e)
     
     # Check if processor can be initialized
     model_loaded = False
@@ -134,9 +134,9 @@ async def health_check():
             ocr_available = True
         except ImportError:
             ocr_available = False
-        except Exception:
+        except (OSError, RuntimeError):
             ocr_available = False
-        
+
         # Check BeautifulSoup availability
         try:
             from bs4 import BeautifulSoup
@@ -145,9 +145,9 @@ async def health_check():
             beautifulsoup_available = True
         except ImportError:
             beautifulsoup_available = False
-        except Exception:
+        except (ValueError, AttributeError):
             beautifulsoup_available = False
-        
+
         # Check image reconstruction capabilities
         try:
             from PIL import Image, ImageDraw, ImageFont
@@ -159,9 +159,9 @@ async def health_check():
             image_reconstruction_available = True
         except ImportError:
             image_reconstruction_available = False
-        except Exception:
+        except (OSError, ValueError):
             image_reconstruction_available = False
-        
+
         # Check HTML reconstruction capabilities
         try:
             from bs4 import BeautifulSoup
@@ -174,11 +174,11 @@ async def health_check():
             html_reconstruction_available = True
         except ImportError:
             html_reconstruction_available = False
-        except Exception:
+        except (ValueError, AttributeError):
             html_reconstruction_available = False
-            
-    except Exception as e:
-        logger.debug(f"Model/OCR health check failed: {e}")
+
+    except (OSError, ImportError) as e:
+        logger.debug("Model/OCR health check failed: %s", e)
     
     return HealthResponse(
         status="healthy" if redis_connected and model_loaded else "degraded",
@@ -240,7 +240,7 @@ async def process_file(
         background_tasks.add_task(cleanup_old_files, "/tmp/outputs", 3600)
         
         # Use universal processor for all input types
-        logger.info(f"Processing {file.filename} with universal processor (async_processing={async_processing} ignored)")
+        logger.info("Processing %s with universal processor (async_processing=%s ignored)", file.filename, async_processing)
         
         universal_processor = get_universal_processor()
         result = universal_processor.process_any_input(file_path, output_dir="/tmp/outputs")
@@ -259,8 +259,8 @@ async def process_file(
     
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Error processing file: {e}", exc_info=True)
+    except (OSError, RuntimeError, ValueError) as e:
+        logger.error("Error processing file: %s", e, exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -323,7 +323,7 @@ async def get_task_status(task_id: str):
             return response
         except AttributeError:
             # Celery backend not configured - return pending status
-            logger.warning(f"Celery backend not configured, returning pending status for task {task_id}")
+            logger.warning("Celery backend not configured, returning pending status for task %s", task_id)
             return TaskStatusResponse(
                 task_id=task_id,
                 status=ProcessingStatus.PENDING,
@@ -331,8 +331,8 @@ async def get_task_status(task_id: str):
                 result={"message": "Task status unavailable - Celery backend not configured"}
             )
     
-    except Exception as e:
-        logger.error(f"Error getting task status: {e}")
+    except (AttributeError, ValueError) as e:
+        logger.error("Error getting task status: %s", e)
         # Return a valid response instead of raising exception
         return TaskStatusResponse(
             task_id=task_id,
@@ -390,8 +390,8 @@ async def metrics():
                     "active_tasks": active_tasks
                 }
             }
-        except Exception as celery_error:
-            logger.warning(f"Celery metrics unavailable: {celery_error}")
+        except (AttributeError, ConnectionError) as celery_error:
+            logger.warning("Celery metrics unavailable: %s", celery_error)
             return {
                 "status": "operational",
                 "processor_stats": processor_stats,
@@ -402,8 +402,8 @@ async def metrics():
                     "message": "Celery backend not configured"
                 }
             }
-    except Exception as e:
-        logger.error(f"Error getting metrics: {e}")
+    except (OSError, AttributeError) as e:
+        logger.error("Error getting metrics: %s", e)
         return {
             "status": "degraded",
             "error": "Metrics unavailable"
@@ -425,8 +425,8 @@ async def performance_stats():
             "cache_size": cache_manager.get_cache_size(),
             "timestamp": time.time()
         }
-    except Exception as e:
-        logger.error(f"Error getting performance stats: {e}")
+    except (OSError, AttributeError) as e:
+        logger.error("Error getting performance stats: %s", e)
         return {
             "error": "Performance stats unavailable",
             "timestamp": time.time()

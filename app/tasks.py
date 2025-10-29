@@ -42,7 +42,7 @@ def process_grammar_correction(self, input_file_path: str, output_dir: str = "/t
         Processing results dictionary
     """
     try:
-        logger.info(f"Processing task {self.request.id} for file: {input_file_path}")
+        logger.info("Processing task %s for file: %s", self.request.id, input_file_path)
         
         # Update task state
         self.update_state(
@@ -60,12 +60,12 @@ def process_grammar_correction(self, input_file_path: str, output_dir: str = "/t
         if not result.get('success', False):
             raise Exception(result.get('error', 'Unknown processing error'))
         
-        logger.info(f"Task {self.request.id} completed successfully")
-        
+        logger.info("Task %s completed successfully", self.request.id)
+
         return result
-    
-    except Exception as e:
-        logger.error(f"Task {self.request.id} failed: {e}", exc_info=True)
+
+    except (OSError, RuntimeError, FileNotFoundError) as e:
+        logger.error("Task %s failed: %s", self.request.id, e, exc_info=True)
         
         # Retry on failure
         try:

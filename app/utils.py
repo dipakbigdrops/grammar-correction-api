@@ -36,16 +36,16 @@ def get_redis_client():
             # Test connection
             redis_client.ping()
             logger.info("✅ Connected to Redis server successfully")
-        except Exception as e:
-            logger.warning(f"Real Redis not available: {e}")
+        except (redis.ConnectionError, redis.TimeoutError, OSError) as e:
+            logger.warning("Real Redis not available: %s", e)
             try:
                 # Fallback to fakeredis (in-memory Redis for development)
-                import fakeredis
+                import fakeredis  # pylint: disable=import-outside-toplevel
                 redis_client = fakeredis.FakeStrictRedis(decode_responses=True)
                 redis_client.ping()
                 logger.info("✅ Using FakeRedis (in-memory) - perfect for development!")
-            except Exception as fake_error:
-                logger.error(f"Failed to initialize FakeRedis: {fake_error}")
+            except (ImportError, AttributeError) as fake_error:
+                logger.error("Failed to initialize FakeRedis: %s", fake_error)
                 redis_client = None
     return redis_client
 
@@ -71,11 +71,11 @@ def get_cached_result(file_hash: str) -> Optional[dict]:
     try:
         cached = client.get(f"result:{file_hash}")
         if cached:
-            logger.info(f"Cache hit for hash: {file_hash}")
+            logger.info("Cache hit for hash: %s", file_hash)
             return json.loads(cached)
-    except Exception as e:
-        logger.error(f"Error getting cached result: {e}")
-    
+    except (redis.RedisError, json.JSONDecodeError) as e:
+        logger.error("Error getting cached result: %s", e)
+
     return None
 
 
@@ -94,9 +94,9 @@ def set_cached_result(file_hash: str, result: dict):
             settings.CACHE_TTL,
             json.dumps(result)
         )
-        logger.info(f"Cached result for hash: {file_hash}")
-    except Exception as e:
-        logger.error(f"Error caching result: {e}")
+        logger.info("Cached result for hash: %s", file_hash)
+    except (redis.RedisError, TypeError) as e:
+        logger.error("Error caching result: %s", e)
 
 
 def create_directories():
@@ -110,9 +110,9 @@ def create_directories():
     for directory in directories:
         try:
             os.makedirs(directory, exist_ok=True)
-            logger.info(f"Created directory: {directory}")
-        except Exception as e:
-            logger.error(f"Error creating directory {directory}: {e}")
+            logger.info("Created directory: %s", directory)
+        except OSError as e:
+            logger.error("Error creating directory %s: %s", directory, e)
 
 def save_uploaded_file(file_content: bytes, filename: str, upload_dir: str = "/tmp/uploads") -> str:
     """Save uploaded file and return path"""
@@ -142,7 +142,7 @@ def save_uploaded_file(file_content: bytes, filename: str, upload_dir: str = "/t
     with open(file_path, 'wb') as f:
         f.write(file_content)
     
-    logger.info(f"Saved uploaded file to: {file_path}")
+    logger.info("Saved uploaded file to: %s", file_path)
     return file_path
 
 
@@ -163,8 +163,8 @@ def cleanup_old_files(directory: str, max_age_seconds: int = 3600):
                 try:
                     os.remove(file_path)
                     removed_count += 1
-                except Exception as e:
-                    logger.error(f"Error removing file {file_path}: {e}")
-    
+                except OSError as e:
+                    logger.error("Error removing file %s: %s", file_path, e)
+
     if removed_count > 0:
-        logger.info(f"Cleaned up {removed_count} old files from {directory}")
+        logger.info("Cleaned up %d old files from %s", removed_count, directory)

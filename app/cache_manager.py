@@ -6,6 +6,9 @@ import hashlib
 import json
 import logging
 from typing import Optional, Dict, Any, List
+
+import redis
+
 from app.config import settings as optimized_settings
 from app.utils import get_redis_client
 
@@ -43,14 +46,13 @@ class CacheManager:
             if cached:
                 self.cache_stats['hits'] += 1
                 self.cache_stats[f'{cache_type}_hits'] += 1
-                logger.debug(f"Cache hit for {key}")
+                logger.debug("Cache hit for %s", key)
                 return json.loads(cached)
-            else:
-                self.cache_stats['misses'] += 1
-                logger.debug(f"Cache miss for {key}")
-                return None
-        except Exception as e:
-            logger.error(f"Error getting cache {key}: {e}")
+            self.cache_stats['misses'] += 1
+            logger.debug("Cache miss for %s", key)
+            return None
+        except (redis.RedisError, json.JSONDecodeError) as e:
+            logger.error("Error getting cache %s: %s", key, e)
             return None
     
     def _set_cache(self, key: str, value: Any, cache_type: str = 'result') -> bool:
@@ -61,10 +63,10 @@ class CacheManager:
         try:
             ttl = self.cache_ttl.get(cache_type, optimized_settings.CACHE_TTL)
             self.redis_client.setex(key, ttl, json.dumps(value))
-            logger.debug(f"Cached {key} with TTL {ttl}")
+            logger.debug("Cached %s with TTL %d", key, ttl)
             return True
-        except Exception as e:
-            logger.error(f"Error setting cache {key}: {e}")
+        except (redis.RedisError, TypeError) as e:
+            logger.error("Error setting cache %s: %s", key, e)
             return False
     
     def get_text_cache(self, text: str) -> Optional[Dict[str, Any]]:
@@ -108,8 +110,8 @@ class CacheManager:
             from app.utils import compute_file_hash
             image_hash = compute_file_hash(image_path)
             return self._get_cache(f"ocr:{image_hash}", 'ocr')
-        except Exception as e:
-            logger.error(f"Error getting OCR cache for {image_path}: {e}")
+        except (OSError, IOError) as e:
+            logger.error("Error getting OCR cache for %s: %s", image_path, e)
             return None
     
     def set_ocr_cache(self, image_path: str, ocr_results: List[Any]) -> bool:
@@ -121,8 +123,8 @@ class CacheManager:
             from app.utils import compute_file_hash
             image_hash = compute_file_hash(image_path)
             return self._set_cache(f"ocr:{image_hash}", ocr_results, 'ocr')
-        except Exception as e:
-            logger.error(f"Error setting OCR cache for {image_path}: {e}")
+        except (OSError, IOError) as e:
+            logger.error("Error setting OCR cache for %s: %s", image_path, e)
             return False
     
     def get_partial_cache(self, partial_key: str) -> Optional[Dict[str, Any]]:
@@ -177,10 +179,10 @@ class CacheManager:
             keys = self.redis_client.keys(pattern)
             if keys:
                 self.redis_client.delete(*keys)
-                logger.info(f"Cleared {len(keys)} cache entries for pattern {pattern}")
+                logger.info("Cleared %d cache entries for pattern %s", len(keys), pattern)
             return True
-        except Exception as e:
-            logger.error(f"Error clearing cache: {e}")
+        except redis.RedisError as e:
+            logger.error("Error clearing cache: %s", e)
             return False
     
     def get_cache_size(self) -> Dict[str, int]:
@@ -194,8 +196,8 @@ class CacheManager:
                 keys = self.redis_client.keys(f"{cache_type}:*")
                 sizes[cache_type] = len(keys)
             return sizes
-        except Exception as e:
-            logger.error(f"Error getting cache size: {e}")
+        except redis.RedisError as e:
+            logger.error("Error getting cache size: %s", e)
             return {}
 
 
