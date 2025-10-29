@@ -29,6 +29,9 @@ ENV/
 env.bak/
 venv.bak/
 .venv/
+activate
+activate.bat
+activate.ps1
 
 # IDE
 .vscode/
@@ -112,6 +115,13 @@ test_results/
 
 # Tests folder (kept locally, not in GitHub)
 tests/
+
+# Test HTML files
+test_html_fix.html
+googlecolab.py
+
+# Temporary test files
+t-Path tests
 
 # Cache directories
 .cache/

@@ -41,7 +41,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         
         # Check rate limit
         if len(self.requests[client_ip]) >= self.requests_per_minute:
-            logger.warning(f"Rate limit exceeded for {client_ip}")
+            logger.warning("Rate limit exceeded for %s", client_ip)
             raise HTTPException(
                 status_code=429,
                 detail=f"Rate limit exceeded. Maximum {self.requests_per_minute} requests per minute."
@@ -54,7 +54,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         ]
         
         if len(recent_requests) >= self.burst:
-            logger.warning(f"Burst limit exceeded for {client_ip}")
+            logger.warning("Burst limit exceeded for %s", client_ip)
             raise HTTPException(
                 status_code=429,
                 detail=f"Burst limit exceeded. Maximum {self.burst} requests per 10 seconds."
@@ -94,11 +94,11 @@ class CircuitBreakerMiddleware(BaseHTTPMiddleware):
         if self.circuit_open[endpoint]:
             # Check if timeout has passed
             if time.time() - self.last_failure_time[endpoint] > self.timeout:
-                logger.info(f"Circuit breaker: Attempting to close circuit for {endpoint}")
+                logger.info("Circuit breaker: Attempting to close circuit for %s", endpoint)
                 self.circuit_open[endpoint] = False
                 self.failures[endpoint] = 0
-            else:
-                logger.warning(f"Circuit breaker: Circuit open for {endpoint}")
+            if self.circuit_open[endpoint]:
+                logger.warning("Circuit breaker: Circuit open for %s", endpoint)
                 raise HTTPException(
                     status_code=503,
                     detail="Service temporarily unavailable. Circuit breaker is open."
@@ -115,7 +115,7 @@ class CircuitBreakerMiddleware(BaseHTTPMiddleware):
             
             return response
             
-        except Exception as e:
+        except (HTTPException, RuntimeError, ValueError) as e:
             self._record_failure(endpoint)
             raise
     
@@ -127,8 +127,9 @@ class CircuitBreakerMiddleware(BaseHTTPMiddleware):
         if self.failures[endpoint] >= self.failure_threshold:
             self.circuit_open[endpoint] = True
             logger.error(
-                f"Circuit breaker: Opening circuit for {endpoint} "
-                f"after {self.failures[endpoint]} failures"
+                "Circuit breaker: Opening circuit for %s after %d failures",
+                endpoint,
+                self.failures[endpoint]
             )
 
 
@@ -157,17 +158,18 @@ class RequestTrackingMiddleware(BaseHTTPMiddleware):
             
             # Log slow requests
             if duration > 5.0:
-                logger.warning(
-                    f"Slow request: {endpoint} took {duration:.2f}s"
-                )
-            
+                logger.warning("Slow request: %s took %.2fs", endpoint, duration)
+
             return response
-            
-        except Exception as e:
+
+        except (RuntimeError, ValueError) as e:
             duration = time.time() - start_time
             logger.error(
-                f"Request failed: {request.method} {request.url.path} "
-                f"after {duration:.2f}s - {str(e)}"
+                "Request failed: %s %s after %.2fs - %s",
+                request.method,
+                request.url.path,
+                duration,
+                str(e)
             )
             raise
     
