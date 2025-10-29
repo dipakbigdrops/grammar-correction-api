@@ -53,11 +53,11 @@ tests/
 test_*.html
 test_*.png
 
-# Documentation
-README.md
+# Documentation (keep README.md for Docker context)
 *.md
+!README.md
 
-# Deployment files
+# Deployment files (not needed in image)
 docker-compose*.yml
 deploy*.sh
 deploy*.ps1
