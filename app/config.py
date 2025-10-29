@@ -21,14 +21,14 @@ class Settings(BaseSettings):
     API_WORKERS: int = 4
     
     # Redis Settings
-    REDIS_HOST: str = "redis"  # Use "redis" for production, "localhost" for local development
+    REDIS_HOST: str = "localhost"  # Use "redis" for production, "localhost" for local development
     REDIS_PORT: int = 6379
     REDIS_DB: int = 0
     REDIS_PASSWORD: str = "BigDrops@9991"
     
-    # Celery Settings
-    CELERY_BROKER_URL: str = "redis://:BigDrops@9991@redis:6379/0"
-    CELERY_RESULT_BACKEND: str = "redis://:BigDrops@9991@redis:6379/0"
+    # Celery Settings (auto-generated from Redis settings if not provided)
+    CELERY_BROKER_URL: str = ""
+    CELERY_RESULT_BACKEND: str = ""
     CELERY_TASK_TRACK_STARTED: bool = True
     CELERY_TASK_TIME_LIMIT: int = 300  # 5 minutes
     CELERY_TASK_SOFT_TIME_LIMIT: int = 240  # 4 minutes
