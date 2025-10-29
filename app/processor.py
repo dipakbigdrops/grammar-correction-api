@@ -22,29 +22,29 @@ logger = logging.getLogger(__name__)
 
 class GrammarCorrectionProcessor:
     """Fixed grammar correction processor with singleton pattern"""
-    
+
     _instance = None
     _initialized = False
-    
+
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super().__new__(cls)
         return cls._instance
-    
+
     def __init__(self):
         # Only initialize once (singleton pattern)
         if GrammarCorrectionProcessor._initialized:
             return
-            
+
         self.model = None
         self.tokenizer = None
         self.ocr_reader = None
         self._load_model()
         self._initialize_ocr()
-        
+
         GrammarCorrectionProcessor._initialized = True
         logger.info(" GrammarCorrectionProcessor initialized (singleton)")
-    
+
     def _load_model(self):
         """Load model with ultimate robust error handling"""
         try:
@@ -55,13 +55,13 @@ class GrammarCorrectionProcessor:
                 from app.robust_model_loader import get_model_info
                 model_info = get_model_info(settings.MODEL_PATH)
                 logger.info("Model info: %s", model_info)
-                
+
                 # Try to load with ultimate robust loader
                 self.model, self.tokenizer = load_robust_model(settings.MODEL_PATH)
-                
+
                 if self.model is not None and self.tokenizer is not None:
                     logger.info(" Model loaded successfully with ultimate robust loader")
-                    
+
                     # Test the model with a simple inference
                     try:
                         test_result = test_model_inference(self.model, self.tokenizer, "This is a test.")
@@ -80,7 +80,7 @@ class GrammarCorrectionProcessor:
             logger.error(" Error loading model: %s", e)
             self.model = None
             self.tokenizer = None
-    
+
     def _initialize_ocr(self):
         """Initialize OCR reader for text extraction from images"""
         try:
@@ -90,14 +90,14 @@ class GrammarCorrectionProcessor:
         except (ImportError, OSError, RuntimeError) as e:
             logger.warning("OCR not available: %s", e)
             self.ocr_reader = None
-    
+
     def is_ready(self) -> Dict[str, bool]:
         """Check readiness"""
         return {
             "model_loaded": self.model is not None,
             "ocr_available": self.ocr_reader is not None
         }
-    
+
     def handle_input(self, input_source_path: str) -> Tuple[Optional[Any], str]:
         """
         Handle input file and determine its type.
@@ -119,7 +119,7 @@ class GrammarCorrectionProcessor:
         if file_extension in settings.ALLOWED_HTML_EXTENSIONS:
             # Try multiple encodings to handle different file formats
             encodings = ['utf-8', 'utf-16', 'utf-16-le', 'utf-16-be', 'latin-1', 'cp1252']
-            
+
             for encoding in encodings:
                 try:
                     with open(input_source_path, 'r', encoding=encoding) as f:
@@ -131,7 +131,7 @@ class GrammarCorrectionProcessor:
                 except OSError as e:
                     logger.warning("Error reading HTML file with %s: %s", encoding, e)
                     continue
-            
+
             # If all encodings fail, try reading as binary and decode with error handling
             try:
                 with open(input_source_path, 'rb') as f:
@@ -180,11 +180,11 @@ class GrammarCorrectionProcessor:
         if input_type == 'html':
             # For HTML, we need to preserve the structure while extracting text for correction
             soup = BeautifulSoup(content, 'html.parser')
-            
+
             # Extract text content for grammar correction while preserving HTML structure
             extracted_text = ""
             text_elements = []
-            
+
             # Find all text-containing elements
             for element in soup.find_all(['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'div', 'li', 'span', 'a', 'strong', 'em', 'b', 'i']):
                 if element.get_text().strip():  # Only process elements with actual text
@@ -204,22 +204,22 @@ class GrammarCorrectionProcessor:
         if not self.model or not self.tokenizer:
             logger.info("Model not available, using fallback correction")
             return self._fallback_correction(text)
-        
+
         try:
             # Clean and prepare text for processing
             text = text.strip()
             if not text:
                 return text
-                
+
             # Use the exact same logic as googlecolab.py
             device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
             self.model.to(device)
-            
+
             # Tokenize the input text (exactly like googlecolab.py)
             inputs = self.tokenizer(text, return_tensors="pt", padding=True, truncation=True, max_length=128)
             input_ids = inputs['input_ids'].to(device)
             attention_mask = inputs['attention_mask'].to(device)
-            
+
             # Generate the corrected text (exactly like googlecolab.py)
             with torch.no_grad():
                 generated_ids = self.model.generate(
@@ -229,18 +229,18 @@ class GrammarCorrectionProcessor:
                     num_beams=5,  # Beam search for better quality
                     early_stopping=True
                 )
-            
+
             # Decode the generated IDs to text
             corrected_text = self.tokenizer.decode(generated_ids[0], skip_special_tokens=True)
-            
+
             # If result is empty, it's a model failure - use fallback
             if not corrected_text or corrected_text.strip() == "":
                 logger.warning("Model returned empty result, using fallback correction")
                 return self._fallback_correction(text)
-            
+
             # Clean up the corrected text
             corrected_text = corrected_text.strip()
-            
+
             # Check if the model actually made changes
             if corrected_text == text:
                 logger.info("Model found no grammar errors, trying fallback correction")
@@ -258,7 +258,7 @@ class GrammarCorrectionProcessor:
             logger.error("Grammar correction error: %s", e)
             logger.info("Falling back to rule-based correction")
             return self._fallback_correction(text)
-    
+
     def _fallback_correction(self, text: str) -> str:
         """Enhanced fallback corrections for common errors and OCR mistakes"""
         corrections = {
@@ -271,7 +271,7 @@ class GrammarCorrectionProcessor:
             r'\boccured\b': 'occurred',
             r'\bseperate\b': 'separate',
             r'\bdefinately\b': 'definitely',
-            
+
             # Contractions
             r'\bdont\b': "don't",
             r'\bwont\b': "won't",
@@ -287,26 +287,26 @@ class GrammarCorrectionProcessor:
             r'\bwouldnt\b': "wouldn't",
             r'\bcouldnt\b': "couldn't",
             r'\bshouldnt\b': "shouldn't",
-            
+
             # OCR common mistakes (letter confusions)
             r'\b0\b': 'O',  # Zero confused with letter O
             r'\bl\b(?=[A-Z])': 'I',  # lowercase L confused with I
             r'\brn\b': 'm',  # rn confused with m
             r'\bvv\b': 'w',  # vv confused with w
         }
-        
+
         corrected_text = text
         corrections_made = 0
-        
+
         for pattern, replacement in corrections.items():
             new_text = re.sub(pattern, replacement, corrected_text, flags=re.IGNORECASE)
             if new_text != corrected_text:
                 corrections_made += 1
             corrected_text = new_text
-        
+
         if corrections_made > 0:
             logger.info("Fallback correction applied %d fixes", corrections_made)
-        
+
         return corrected_text
 
     def identify_corrections(self, original_text: str, corrected_text: str, context_words: int = 3) -> List[Dict[str, str]]:
@@ -315,12 +315,12 @@ class GrammarCorrectionProcessor:
         Matches googlecolab.py exactly.
         """
         from difflib import Differ
-        
+
         # Quick check: if texts are identical, no corrections needed
         if original_text.strip() == corrected_text.strip():
             logger.info("No corrections needed - texts are identical")
             return []
-        
+
         # Tokenize including punctuation as separate tokens (exactly like googlecolab.py)
         original_tokens_with_sep = re.findall(r'(\b\w+\b|\W+)', original_text)
         corrected_tokens_with_sep = re.findall(r'(\b\w+\b|\W+)', corrected_text)
@@ -360,7 +360,7 @@ class GrammarCorrectionProcessor:
                 while original_buffer or corrected_buffer:
                     orig = original_buffer.pop(0) if original_buffer else ''
                     corr = corrected_buffer.pop(0) if corrected_buffer else ''
-                    
+
                     # Only add to corrections if there's a change or non-empty insertion/deletion
                     if orig != corr or (orig == '' and corr != '') or (orig != '' and corr == ''):
                         # Find the index of the original word in the original_words list
@@ -408,7 +408,7 @@ class GrammarCorrectionProcessor:
                             corrected_context = ""
 
                         # Only add meaningful corrections (filter out empty or unchanged corrections)
-                        if (orig.strip() != corr.strip() and 
+                        if (orig.strip() != corr.strip() and
                             (orig.strip() != '' or corr.strip() != '') and
                             original_context.strip() != corrected_context.strip()):
                             corrections.append({
@@ -429,7 +429,7 @@ class GrammarCorrectionProcessor:
         while original_buffer or corrected_buffer:
             orig = original_buffer.pop(0) if original_buffer else ''
             corr = corrected_buffer.pop(0) if corrected_buffer else ''
-            
+
             if orig != corr or (orig == '' and corr != '') or (orig != '' and corr == ''):
                 try:
                     if orig:
@@ -446,8 +446,8 @@ class GrammarCorrectionProcessor:
                         corrected_context_start = max(0, corr_index_in_words - context_words)
                         corrected_context_end = min(len(corrected_words), corr_index_in_words + len([corr]) + context_words)
                         original_context = " ".join(corrected_words[corrected_context_start:corrected_context_end])
-                except Exception as e:
-                    logger.error(f"Error getting original context for {orig} at end: {e}")
+                except (IndexError, ValueError) as e:
+                    logger.error("Error getting original context for %s at end: %s", orig, e)
                     original_context = ""
 
                 try:
@@ -465,12 +465,12 @@ class GrammarCorrectionProcessor:
                         original_context_start = max(0, orig_index_in_words - context_words)
                         original_context_end = min(len(original_words), orig_index_in_words + len([orig]) + context_words)
                         corrected_context = " ".join(original_words[original_context_start:original_context_end])
-                except Exception as e:
-                    logger.error(f"Error getting corrected context for {corr} at end: {e}")
+                except (IndexError, ValueError) as e:
+                    logger.error("Error getting corrected context for %s at end: %s", corr, e)
                     corrected_context = ""
 
                 # Only add meaningful corrections (filter out empty or unchanged corrections)
-                if (orig.strip() != corr.strip() and 
+                if (orig.strip() != corr.strip() and
                     (orig.strip() != '' or corr.strip() != '') and
                     original_context.strip() != corrected_context.strip()):
                     corrections.append({
@@ -487,18 +487,18 @@ class GrammarCorrectionProcessor:
             corr_word = corr_dict['corrected_word']
             orig_context = corr_dict['original_context']
             corr_context = corr_dict['corrected_context']
-            
+
             # Only keep corrections that are meaningful for website display:
             # 1. Words are actually different
             # 2. At least one word is not empty
             # 3. Contexts are different (indicating actual change)
             # 4. Both words are not empty (avoid empty corrections)
-            if (orig_word != corr_word and 
+            if (orig_word != corr_word and
                 (orig_word != '' or corr_word != '') and
                 orig_context != corr_context and
                 orig_word.strip() != '' and corr_word.strip() != ''):
                 cleaned_corrections.append(corr_dict)
-        
+
         logger.info("Filtered corrections: %d -> %d meaningful corrections", len(corrections), len(cleaned_corrections))
 
         return cleaned_corrections
@@ -553,7 +553,7 @@ class GrammarCorrectionProcessor:
                         # Attempt word-level highlighting within the bounding box
                         block_text = text  # Use the original text from OCR
                         block_text_lower = block_text.lower()
-                        
+
                         # Iterate through the original words that were corrected
                         for original_word_lower in original_corrected_words_set:
                             # Find all occurrences of the original word within the block text
@@ -561,11 +561,11 @@ class GrammarCorrectionProcessor:
                             for match in re.finditer(r'\b' + re.escape(original_word_lower) + r'\b', block_text_lower):
                                 start_index = match.start()
                                 word_length = len(match.group(0))
-                                
+
                                 # Basic approximation for word position within the block
                                 block_width = x2 - x1
                                 char_width_approx = block_width / len(block_text) if len(block_text) > 0 else 0
-                                
+
                                 word_x1 = x1 + (start_index * char_width_approx)
                                 word_y1 = y1
                                 word_x2 = word_x1 + (word_length * char_width_approx)
@@ -678,9 +678,9 @@ class GrammarCorrectionProcessor:
         except (TypeError, ValueError) as e:
             logger.error("Error generating JSON: %s", e)
             json_output_string = "[]"
-        
+
         return content_output, json_output_string
-    
+
     def process_input(self, input_source_path: str, output_dir: str = "/tmp") -> Dict[str, Any]:
         """
         Process input end-to-end.
@@ -693,7 +693,7 @@ class GrammarCorrectionProcessor:
             Dictionary with processing results
         """
         start_time = time.time()
-        
+
         try:
             # 1. Handle input
             original_content, input_type = self.handle_input(input_source_path)
@@ -704,7 +704,7 @@ class GrammarCorrectionProcessor:
                     "error": f"Failed to handle input: {input_type}",
                     "input_type": input_type
                 }
-            
+
             # 2. Extract text
             if input_type == 'image':
                 extracted_texts, original_ocr_results = self.extract_text(original_content, input_type)
@@ -742,7 +742,7 @@ class GrammarCorrectionProcessor:
                 original_text_for_comparison = " ".join(extracted_texts) if extracted_texts else ""
             else:
                 original_text_for_comparison = extracted_text
-            
+
             corrections = self.identify_corrections(original_text_for_comparison, corrected_text)
 
             # 5. Reconstruct with highlighting
@@ -753,7 +753,7 @@ class GrammarCorrectionProcessor:
                 corrections,
                 original_ocr_results=original_ocr_results if input_type == 'image' else None
             )
-            
+
             # 6. Generate output
             content_output, json_output = self.generate_output(
                 reconstructed_content,
@@ -761,7 +761,7 @@ class GrammarCorrectionProcessor:
                 corrections,
                 output_dir=output_dir
             )
-            
+
             processing_time = time.time() - start_time
 
             return {
@@ -774,7 +774,7 @@ class GrammarCorrectionProcessor:
                 "output_content": content_output,  # Contains base64 image or HTML string
                 "processing_time_seconds": round(processing_time, 2)
             }
-        
+
         except (OSError, RuntimeError, ValueError) as e:
             logger.error("Error in process_input: %s", e, exc_info=True)
             return {
