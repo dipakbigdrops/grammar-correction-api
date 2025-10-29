@@ -113,6 +113,9 @@ test_results/
 # Tests folder (kept locally, not in GitHub)
 tests/
 
+# Test HTML files
+test_html_fix.html
+
 # Cache directories
 .cache/
 .pytest_cache/
