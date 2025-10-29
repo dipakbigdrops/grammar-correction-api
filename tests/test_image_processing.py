@@ -74,23 +74,8 @@ class TestImageProcessingPipeline:
         
         # Test cases with different grammatical errors
         # Note: OCR may not detect all text perfectly, so we focus on basic functionality
-        test_cases = [
-            {
-                "filename": "test_grammar_errors_1.png",
-                "text": "This are a test sentence with grammar error. It dont work properly.",
-                "expected_corrections": ["are"]  # More lenient - just check for basic corrections
-            },
-            {
-                "filename": "test_grammar_errors_2.png", 
-                "text": "The students was working on theyre homework. They havent finished yet.",
-                "expected_corrections": ["was"]  # More lenient - just check for basic corrections
-            },
-            {
-                "filename": "test_grammar_errors_3.png",
-                "text": "I recieved a email yesterday. The content was definately interesting.",
-                "expected_corrections": ["a"]  # More lenient - just check for basic corrections
-            }
-        ]
+        from tests.test_constants import TEST_CASES_WITH_EXPECTATIONS
+        test_cases = TEST_CASES_WITH_EXPECTATIONS
         
         results = []
         

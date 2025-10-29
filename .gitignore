@@ -110,6 +110,9 @@ test_results/
 *.test.jpg
 *.test.jpeg
 
+# Tests folder (kept locally, not in GitHub)
+tests/
+
 # Cache directories
 .cache/
 .pytest_cache/

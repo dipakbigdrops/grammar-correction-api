@@ -1,0 +1,26 @@
+[1mdiff --git a/app/config.py b/app/config.py[m
+[1mindex d0e85f6..bc1aa03 100644[m
+[1m--- a/app/config.py[m
+[1m+++ b/app/config.py[m
+[36m@@ -120,13 +120,15 @@[m [mclass Settings(BaseSettings):[m
+     def __init__(self, **kwargs):[m
+         super().__init__(**kwargs)[m
+         # Auto-generate Celery URLs if not provided[m
+[31m-        if not self.CELERY_BROKER_URL:[m
+[32m+[m[32m        if not self.CELERY_BROKER_URL or not self.CELERY_RESULT_BACKEND:[m
+             redis_auth = f":{self.REDIS_PASSWORD}@" if self.REDIS_PASSWORD else ""[m
+[31m-            self.CELERY_BROKER_URL = f"redis://{redis_auth}{self.REDIS_HOST}:{self.REDIS_PORT}/{self.REDIS_DB}"[m
+[31m-        [m
+[31m-        if not self.CELERY_RESULT_BACKEND:[m
+[31m-            redis_auth = f":{self.REDIS_PASSWORD}@" if self.REDIS_PASSWORD else ""[m
+[31m-            self.CELERY_RESULT_BACKEND = f"redis://{redis_auth}{self.REDIS_HOST}:{self.REDIS_PORT}/{self.REDIS_DB}"[m
+[32m+[m[32m            redis_url = f"redis://{redis_auth}{self.REDIS_HOST}:{self.REDIS_PORT}/{self.REDIS_DB}"[m
+[32m+[m[41m            [m
+[32m+[m[32m            if not self.CELERY_BROKER_URL:[m
+[32m+[m[32m                self.CELERY_BROKER_URL = redis_url[m
+[32m+[m[41m            [m
+[32m+[m[32m            if not self.CELERY_RESULT_BACKEND:[m
+[32m+[m[32m                self.CELERY_RESULT_BACKEND = redis_url[m
+         [m
+         # Validate batch processing settings[m
+         if self.MAX_FILES_IN_ZIP > 1000:[m
