@@ -5,6 +5,7 @@ Handles all environment variables and settings
 from pydantic_settings import BaseSettings
 from functools import lru_cache
 import os
+import json
 
 
 class Settings(BaseSettings):
@@ -24,7 +25,7 @@ class Settings(BaseSettings):
     REDIS_HOST: str = "localhost"  # Use "redis" for production, "localhost" for local development
     REDIS_PORT: int = 6379
     REDIS_DB: int = 0
-    REDIS_PASSWORD: str = "BigDrops@9991"
+    REDIS_PASSWORD: str = ""  # Set via environment variable in production
     
     # Celery Settings (auto-generated from Redis settings if not provided)
     CELERY_BROKER_URL: str = ""
@@ -119,6 +120,31 @@ class Settings(BaseSettings):
     
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+        
+        # Parse list fields from JSON strings if they are strings
+        # This handles cases where environment variables are set as JSON strings
+        list_fields = [
+            'ALLOWED_ORIGINS', 'CORS_ALLOW_METHODS', 'CORS_ALLOW_HEADERS',
+            'OCR_LANGUAGES', 'ALLOWED_IMAGE_EXTENSIONS', 'ALLOWED_HTML_EXTENSIONS',
+            'ALLOWED_ARCHIVE_EXTENSIONS'
+        ]
+        
+        for field in list_fields:
+            value = getattr(self, field, None)
+            if isinstance(value, str):
+                try:
+                    # Try to parse as JSON
+                    parsed = json.loads(value)
+                    if isinstance(parsed, list):
+                        setattr(self, field, parsed)
+                except (json.JSONDecodeError, TypeError):
+                    # If not JSON, try splitting by comma
+                    if value.strip() == "*":
+                        setattr(self, field, ["*"])
+                    else:
+                        # Split by comma and strip whitespace
+                        setattr(self, field, [item.strip() for item in value.split(",") if item.strip()])
+        
         # Auto-generate Celery URLs if not provided
         if not self.CELERY_BROKER_URL or not self.CELERY_RESULT_BACKEND:
             redis_auth = f":{self.REDIS_PASSWORD}@" if self.REDIS_PASSWORD else ""

@@ -41,15 +41,18 @@ COPY . .
 
 # Download model from Hugging Face during deployment
 # This solves Git LFS issues by downloading model at build time instead of from Git
+# MODEL_ID should be set as build arg or environment variable
+ARG MODEL_ID=""
+ARG HF_TOKEN=""
 RUN mkdir -p ./model && \
-    if [ -n "$MODEL_ID" ]; then \
-        echo "Downloading model from Hugging Face: $MODEL_ID"; \
-        python -c "from huggingface_hub import snapshot_download; import os; snapshot_download(repo_id=os.environ['MODEL_ID'], local_dir='./model', token=os.environ.get('HF_TOKEN', None))"; \
+    if [ -n "${MODEL_ID}" ]; then \
+        echo "Downloading model from Hugging Face: ${MODEL_ID}"; \
+        python -c "from huggingface_hub import snapshot_download; import os; model_id = os.environ.get('MODEL_ID', '${MODEL_ID}'); token = os.environ.get('HF_TOKEN', '${HF_TOKEN}') or None; snapshot_download(repo_id=model_id, local_dir='./model', token=token)"; \
         echo "Model downloaded successfully from Hugging Face"; \
-        ls -lh ./model/ || echo "Model directory listing failed"; \
+        ls -lh ./model/ 2>/dev/null || echo "Note: Model directory listing unavailable"; \
     else \
-        echo "WARNING: MODEL_ID not set - model will not be downloaded"; \
-        echo "App will work but grammar correction may be limited (fallback mode)"; \
+        echo "WARNING: MODEL_ID not set during build - model will not be downloaded"; \
+        echo "Model can be downloaded at runtime if MODEL_ID environment variable is set"; \
     fi
 
 # Create necessary directories
