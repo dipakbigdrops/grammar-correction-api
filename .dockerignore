@@ -70,3 +70,13 @@ production.env
 /tmp/
 *.tmp
 *.temp
+
+# Model files - downloaded from Hugging Face during build, not from repository
+model/*.bin
+model/*.safetensors
+model/*.model
+model/tokenizer.json
+model/training_args.bin
+model/spiece.model
+# Keep model directory structure but exclude actual files
+!model/.gitkeep

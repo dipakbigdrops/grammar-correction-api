@@ -172,13 +172,9 @@ cython_debug/
 local_config.py
 dev_settings.py
 
-# Model files (handled by Git LFS)
-# model/
-# *.safetensors
-# *.bin
-# *.model
-
-# Large files that should be in LFS
+# Model files - downloaded from Hugging Face during deployment
+# Not tracked in Git to avoid LFS issues
+model/
 *.safetensors
 *.bin
 *.model

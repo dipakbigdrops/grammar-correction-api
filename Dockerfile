@@ -29,12 +29,28 @@ WORKDIR /app
 # Copy requirements first for better Docker layer caching
 COPY requirements.txt .
 
+# Skip Git LFS during build (prevents LFS download failures)
+ENV GIT_LFS_SKIP_SMUDGE=1
+
 # Upgrade pip and install Python dependencies
 RUN pip install --upgrade pip setuptools wheel && \
     pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
 COPY . .
+
+# Download model from Hugging Face during deployment
+# This solves Git LFS issues by downloading model at build time instead of from Git
+RUN mkdir -p ./model && \
+    if [ -n "$MODEL_ID" ]; then \
+        echo "Downloading model from Hugging Face: $MODEL_ID"; \
+        python -c "from huggingface_hub import snapshot_download; import os; snapshot_download(repo_id=os.environ['MODEL_ID'], local_dir='./model', token=os.environ.get('HF_TOKEN', None))"; \
+        echo "Model downloaded successfully from Hugging Face"; \
+        ls -lh ./model/ || echo "Model directory listing failed"; \
+    else \
+        echo "WARNING: MODEL_ID not set - model will not be downloaded"; \
+        echo "App will work but grammar correction may be limited (fallback mode)"; \
+    fi
 
 # Create necessary directories
 RUN mkdir -p /tmp/uploads /tmp/cache /tmp/outputs && \
