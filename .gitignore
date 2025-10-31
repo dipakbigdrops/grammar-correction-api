@@ -178,3 +178,6 @@ model/
 *.safetensors
 *.bin
 *.model
+
+# Hugging Face upload script (not needed in repository)
+upload_model_to_hf.py
