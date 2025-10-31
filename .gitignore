@@ -173,8 +173,16 @@ local_config.py
 dev_settings.py
 
 # Model files - downloaded from Hugging Face during deployment
-# Not tracked in Git to avoid LFS issues
+# NOT tracked in Git to avoid LFS issues
+# All model files are excluded - they will be downloaded from Hugging Face during deployment
 model/
+model/*.json
+model/*.safetensors
+model/*.bin
+model/*.model
+model/*.txt
+model/spiece.model
+model/training_args.bin
 *.safetensors
 *.bin
 *.model
